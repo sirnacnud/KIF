@@ -236,7 +236,13 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                     [indexPathsForVisibleRows addObject:indexPath];
                 }
             }];
-            
+
+			NSIndexPath *firstIndexPath = indexPathsForVisibleRows.firstObject;
+			for (NSIndexPath *ip in indexPathsForVisibleRows) {
+				if ([firstIndexPath compare:ip] == NSOrderedAscending) {
+					firstIndexPath = ip;
+				}
+			}
             for (NSUInteger section = 0, numberOfSections = [tableView numberOfSections]; section < numberOfSections; section++) {
                 for (NSUInteger row = 0, numberOfRows = [tableView numberOfRowsInSection:section]; row < numberOfRows; row++) {
                     if (!self.window) {
@@ -247,32 +253,28 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                     NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
                     if ([indexPathsForVisibleRows containsObject:indexPath]) {
                         continue;
-                    }
-                    
-                    @autoreleasepool {
-                        // Get the cell directly from the dataSource because UITableView will only vend visible cells
-                        UITableViewCell *cell = [tableView.dataSource tableView:tableView cellForRowAtIndexPath:indexPath];
-                        
-                        UIAccessibilityElement *element = [cell accessibilityElementMatchingBlock:matchBlock notHidden:NO];
-                        
-                        // Remove the cell from the table view so that it doesn't stick around
-                        [cell removeFromSuperview];
-                        
-                        // Skip this cell if it isn't the one we're looking for
-                        if (!element) {
-                            continue;
-                        }
-                    }
-                    
-                    // Scroll to the cell and wait for the animation to complete
-                    [tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionNone animated:YES];
-                    // Note: using KIFRunLoopRunInModeRelativeToAnimationSpeed here may cause tests to stall
-                    CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0.5, false);
-                    
+					}
+
+					@autoreleasepool {
+						// Scroll to the cell and wait for the animation to complete
+						[tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionNone animated:NO];
+						// Note: using KIFRunLoopRunInModeRelativeToAnimationSpeed here may cause tests to stall
+
+						UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+						UIAccessibilityElement *element = [cell accessibilityElementMatchingBlock:matchBlock notHidden:NO];
+
+						// Skip this cell if it isn't the one we're looking for
+						if (!element) {
+							continue;
+						}
+					}
+					CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0, false);
+
                     // Now try finding the element again
                     return [self accessibilityElementMatchingBlock:matchBlock];
                 }
             }
+			[tableView scrollToRowAtIndexPath:firstIndexPath atScrollPosition:UITableViewScrollPositionTop animated:NO];
         } else if ([self isKindOfClass:[UICollectionView class]]) {
             UICollectionView *collectionView = (UICollectionView *)self;
             
