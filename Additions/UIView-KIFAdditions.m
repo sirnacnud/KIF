@@ -226,7 +226,8 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     if (!matchingButOccludedElement && self.window) {
         if ([self isKindOfClass:[UITableView class]]) {
             UITableView *tableView = (UITableView *)self;
-            
+            __block NSIndexPath *firstIndexPath = nil;
+
             // Because of a bug in [UITableView indexPathsForVisibleRows] http://openradar.appspot.com/radar?id=5191284490764288
             // We use [UITableView visibleCells] to determine the index path of the visible cells
             NSMutableArray *indexPathsForVisibleRows = [[NSMutableArray alloc] init];
@@ -235,14 +236,15 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                 if (indexPath) {
                     [indexPathsForVisibleRows addObject:indexPath];
                 }
+                if (firstIndexPath == nil) {
+                    firstIndexPath = indexPath;
+                } else {
+                    if ([firstIndexPath compare:indexPath] == NSOrderedDescending) {
+                        firstIndexPath = indexPath;
+                    }
+                }
             }];
 
-			NSIndexPath *firstIndexPath = indexPathsForVisibleRows.firstObject;
-			for (NSIndexPath *ip in indexPathsForVisibleRows) {
-				if ([firstIndexPath compare:ip] == NSOrderedAscending) {
-					firstIndexPath = ip;
-				}
-			}
             for (NSUInteger section = 0, numberOfSections = [tableView numberOfSections]; section < numberOfSections; section++) {
                 for (NSUInteger row = 0, numberOfRows = [tableView numberOfRowsInSection:section]; row < numberOfRows; row++) {
                     if (!self.window) {
@@ -253,28 +255,30 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
                     NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
                     if ([indexPathsForVisibleRows containsObject:indexPath]) {
                         continue;
-					}
+                    }
 
-					@autoreleasepool {
-						// Scroll to the cell and wait for the animation to complete
-						[tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionNone animated:NO];
-						// Note: using KIFRunLoopRunInModeRelativeToAnimationSpeed here may cause tests to stall
+                    @autoreleasepool {
+                        // Scroll to the cell
+                        [tableView scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionNone animated:NO];
 
-						UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
-						UIAccessibilityElement *element = [cell accessibilityElementMatchingBlock:matchBlock notHidden:NO];
+                        UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+                        UIAccessibilityElement *element = [cell accessibilityElementMatchingBlock:matchBlock notHidden:NO];
 
-						// Skip this cell if it isn't the one we're looking for
-						if (!element) {
-							continue;
-						}
-					}
-					CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0, false);
-
+                        // Skip this cell if it isn't the one we're looking for
+                        if (!element) {
+                            continue;
+                        }
+                    }
                     // Now try finding the element again
+                    NSLog(@"Found at indexPath: %@", indexPath);
+                    CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0, false);
                     return [self accessibilityElementMatchingBlock:matchBlock];
                 }
             }
-			[tableView scrollToRowAtIndexPath:firstIndexPath atScrollPosition:UITableViewScrollPositionTop animated:NO];
+            if (firstIndexPath) {
+                [tableView scrollToRowAtIndexPath:firstIndexPath atScrollPosition:UITableViewScrollPositionTop animated:NO];
+            }
+            CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0, false);
         } else if ([self isKindOfClass:[UICollectionView class]]) {
             UICollectionView *collectionView = (UICollectionView *)self;
             
@@ -320,7 +324,7 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             }
         }
     }
-        
+    
     return matchingButOccludedElement;
 }
 
