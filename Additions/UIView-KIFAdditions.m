@@ -224,7 +224,26 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
     }
     
     if (!matchingButOccludedElement && self.window) {
+
+		CGPoint scrollContentOffset;
+		UIScrollView *scrollView = nil;
         if ([self isKindOfClass:[UITableView class]]) {
+			//special case for UIPickerView (which has a private class UIPickerTableView)
+			if ([self isKindOfClass:[UIScrollView class]]) {
+				NSArray *subviews = [self subviews];
+				for (UIView *view in subviews)
+				{
+					NSString * subViewName = [NSString stringWithFormat:@"%@", [view class]];
+					if ([subViewName containsString:@"UIPicker"] )
+					{
+						NSLog(@"Found Picker");
+						scrollView = (UIScrollView*)self;
+						scrollContentOffset = [scrollView contentOffset];
+						break;
+					}
+				}
+			}
+
             UITableView *tableView = (UITableView *)self;
             __block NSIndexPath *firstIndexPath = nil;
 
@@ -278,6 +297,11 @@ NS_INLINE BOOL StringsMatchExceptLineBreaks(NSString *expected, NSString *actual
             if (firstIndexPath) {
                 [tableView scrollToRowAtIndexPath:firstIndexPath atScrollPosition:UITableViewScrollPositionTop animated:NO];
             }
+			//if we're in a picker (scrollView), let's make sure we set the position back to how it was last set.
+			if(scrollView)
+			{
+				[scrollView setContentOffset:scrollContentOffset];
+			}
             CFRunLoopRunInMode(UIApplicationCurrentRunMode, 0, false);
         } else if ([self isKindOfClass:[UICollectionView class]]) {
             UICollectionView *collectionView = (UICollectionView *)self;
